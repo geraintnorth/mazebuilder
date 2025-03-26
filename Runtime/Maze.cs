@@ -54,15 +54,13 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
     [Serializable]
     public  class SerializedCell
     {
-        public int x;
-        public int y;
+        public Vector2Int pos;
 
         public int index;
 
-        public SerializedCell(Vector2Int pos, int _index)
+        public SerializedCell(Vector2Int _pos, int _index)
         {   
-            x = pos.x;
-            y = pos.y;
+            pos = _pos;
             index = _index;
         }
     }
@@ -130,19 +128,18 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
     }
 
 
-    public int startX { get { return m_startX; } set { m_startX = value;}}
-    [SerializeField] private int m_startX = 0;
+    public Vector2Int start { get { return m_start; } set { m_start = value;}}
+    [SerializeField] private Vector2Int m_start = new Vector2Int(-10,-10);
     
-    public int startY { get { return m_startY; } set { m_startY = value;}}
-    [SerializeField] private int m_startY = 0;
+    public Vector2Int span { get { return m_span; } set
+        {
+            if (value.x > 0) { m_span.x = value.x;}
+            if (value.y > 0) { m_span.y = value.y;}
+        }
+    }
 
-    public int spanX { get { return m_spanX; } set { if (value>0) { m_spanX = value;}}}
+    [SerializeField] private Vector2Int m_span = new Vector2Int(20,20);
 
-    [SerializeField] private int m_spanX = 20;
-
-    public int spanY { get { return m_spanY; } set { if (value>0) { m_spanY = value;}}}
-    [SerializeField] private int m_spanY = 20;
-    
     public float height { get { return m_height; } set { if (value>0) { m_height = value;}}}
     [SerializeField] private float m_height = 3;
 
@@ -157,8 +154,8 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
 
     void OnValidate()
     {
-        m_spanX = Math.Max(m_spanX, 1);
-        m_spanY = Math.Max(m_spanY, 1);
+        m_span.x = Math.Max(m_span.x, 1);
+        m_span.y = Math.Max(m_span.y, 1);
         m_height = Math.Max(m_height,0);
 
         if (renderProperties != null)
@@ -379,7 +376,7 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
         cells = new Dictionary<Vector2Int, int>();
         foreach(SerializedCell cell in serializedCells)
         {
-            Vector2Int key = new Vector2Int(cell.x, cell.y);
+            Vector2Int key = cell.pos;
             cells[key] = cell.index;
         }
         needMeshRegen = true;
