@@ -1,0 +1,16 @@
+{
+    "name": "Metagnosis.MazeBuilder.Editor",
+    "rootNamespace": "Metagnosis.MazeBuilder.Editor",
+    "references": [
+        "Metagnosis.MazeBuilder"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
