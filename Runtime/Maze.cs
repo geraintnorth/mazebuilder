@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using System;
-using UnityEditor.SearchService;
-using UnityEngine.SceneManagement;
+
+#if UNITY_EDITOR
 
 [ExecuteAlways]
 public class Maze : MonoBehaviour, ISerializationCallbackReceiver
@@ -232,10 +232,8 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
 
     public void setCell(Vector2Int key, int materialIndex)
     {
-#if UNITY_EDITOR
         EditorUtility.SetDirty(this);
         Undo.RecordObject(this, "modification of cell (" + key.x + "," + key.y + ")");
-#endif
         needMeshRegen = true;
         regenerateCellList = true;
         cells[key] = materialIndex;
@@ -243,10 +241,8 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
 
     public void removeCell(Vector2Int key)
     {
-#if UNITY_EDITOR
         EditorUtility.SetDirty(this);;
         Undo.RecordObject(this, "modification of cell (" + key.x + "," + key.y + ")");
-#endif
         needMeshRegen = true;
         regenerateCellList = true;
         cells.Remove(key);
@@ -454,3 +450,9 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
         needMeshRegen = true;
     }
 }
+#else
+class Maze : MonoBehaviour
+{
+
+}
+#endif
