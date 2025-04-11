@@ -46,9 +46,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_start: {x: -10, y: -10}
   m_span: {x: 20, y: 20}
-  m_height: 3
   cellMaterials:
-  - color: {r: 0, g: 0, b: 0, a: 0}
+  - color: {r: 1, g: 0.7907446, b: 0.1745283, a: 1}
+    ceilingHeight: 3
+    floorHeight: 0
     floorMaterial: {fileID: 2100000, guid: 2e2ccf4dea2584f7d98cc7a0cc3b5f6f, type: 2}
     wallMaterial: {fileID: 2100000, guid: c9d649d06151949f589a82c4423526ac, type: 2}
     ceilingMaterial: {fileID: 2100000, guid: ae7fde43bac3c4d71aeeda73b4ea3e41, type: 2}

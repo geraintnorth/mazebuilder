@@ -123,8 +123,8 @@ public class MazeEditor : Editor {
         {
             for (var y = maze.start.y; y < maze.start.y + maze.span.y; y++)
             {
-                Vector3 pos = maze.transform.TransformPoint(new UnityEngine.Vector3(x+0.5f, 0.1f, y+0.5f));
-                Quaternion rot = maze.transform.rotation * UnityEngine.Quaternion.AngleAxis(90f, UnityEngine.Vector3.right);
+                Vector3 pos = maze.transform.TransformPoint(new Vector3(x+0.5f, 0.1f, y+0.5f));
+                Quaternion rot = maze.transform.rotation * Quaternion.AngleAxis(90f, Vector3.right);
 
                 if (Handles.Button(pos, rot, 0.4f, 0.4f, Handles.CircleHandleCap))
                 {
@@ -163,8 +163,8 @@ public class MazeEditor : Editor {
     {
         Gizmos.matrix = maze.transform.localToWorldMatrix;
         Gizmos.color = Color.grey;
-        Gizmos.DrawWireCube(new Vector3(maze.start.x + maze.span.x/2f, maze.height/2f, maze.start.y + maze.span.y/2f),
-                            new Vector3(maze.span.x, maze.height, maze.span.y));
+        Gizmos.DrawWireCube(new Vector3(maze.start.x + maze.span.x/2f, maze.maxHeight/2f, maze.start.y + maze.span.y/2f),
+                            new Vector3(maze.span.x, maze.maxHeight, maze.span.y));
     }
 
     [DrawGizmo(GizmoType.Selected | GizmoType.Active)]
@@ -189,6 +189,7 @@ public class MazeEditor : Editor {
                     if (materialIndex < maze.cellMaterials.Count)
                     {
                         cellColor = maze.cellMaterials[materialIndex].color;
+                        pos = pos + new Vector3(0, maze.cellMaterials[materialIndex].floorHeight, 0);
                     }
                     else
                     {

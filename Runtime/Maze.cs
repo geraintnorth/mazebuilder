@@ -17,6 +17,12 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
         // This is the Color used in the editor - not visible at runtime
         public Color color = new Color(1,1,1,1);
 
+        // The height of the cell ceiling.  Must always be >= 0.
+        public float ceilingHeight = 3;
+
+        // The height of the cell floor.  Must always be >= 0.
+        public float floorHeight = 0;
+
         // Material to use for the floor.  Floor is not drawn if this material is not set.
         public Material floorMaterial;
         // Material to use for the floor.  Even if not set, will attempt to render
@@ -51,6 +57,8 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
                 return false;
 
             return (color == c.color) &&
+                   (ceilingHeight == c.ceilingHeight) && 
+                   (floorHeight == c.floorHeight) && 
                    (floorMaterial == c.floorMaterial) &&
                    (wallMaterial == c.wallMaterial) &&
                    (ceilingMaterial == c.ceilingMaterial);
@@ -58,7 +66,13 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
 
         public override int GetHashCode()
         {
-            return (color, floorMaterial, wallMaterial, ceilingMaterial).GetHashCode();
+            return (color, ceilingHeight, floorHeight, floorMaterial, wallMaterial, ceilingMaterial).GetHashCode();
+        }
+
+        public void validate()
+        {
+            ceilingHeight = Math.Max(ceilingHeight,0f);
+            floorHeight = Math.Max(floorHeight,0f);
         }
     }
 
@@ -91,16 +105,12 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
     */
     private class InspectorRenderProperties
     {
-        // Height of the maze
-        public float height;
-
         // A list of all the materials - if we change materials we need to regenerate
         // the mesh so that it picks them up.
         public List<CellMaterial> cellMaterials = new List<CellMaterial>();
 
-        public InspectorRenderProperties(float _height, List<CellMaterial> _cellMaterials)
+        public InspectorRenderProperties(List<CellMaterial> _cellMaterials)
         {
-            height = _height;
             cellMaterials = new List<CellMaterial>();
             for (int i = 0; i < _cellMaterials.Count; i++)
             {
@@ -113,15 +123,9 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
           Returns true if a change was detected, indicating that we need to regenerate
           the maze mesh. 
         */
-        public bool checkAndUpdate(float _height, List<CellMaterial> _cellMaterials)
+        public bool checkAndUpdate(List<CellMaterial> _cellMaterials)
         {
             bool changeDetected = false;
-
-            // Check the height
-            if (height != _height)
-            {
-                changeDetected = true;
-            }
 
             // Check the list lengths
             if (cellMaterials.Count != _cellMaterials.Count)
@@ -143,7 +147,6 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
             if (changeDetected)
             {
                 // If there was a change, copy the new stuff across.
-                height = _height;
                 cellMaterials = new List<CellMaterial>();
                 for (int i = 0; i < _cellMaterials.Count; i++)
                 {
@@ -162,6 +165,8 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
     public Vector2Int start { get {return m_start;} set {m_start = value;}}
     [SerializeField] private Vector2Int m_start = new Vector2Int(-10,-10);
     
+    public float maxHeight { get { return 3;}}
+
     public Vector2Int span { get {return m_span;} set
         {
             if (value.x > 0) { m_span.x = value.x;}
@@ -170,13 +175,9 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
     }
     [SerializeField] private Vector2Int m_span = new Vector2Int(20,20);
 
-    // The height of the maze mesh.  Must always be positive.
-    public float height { get { return m_height; } set { if (value > 0) {m_height = value;}}}
-    [SerializeField] private float m_height = 3;
-
     // The list of CellMaterial objects.  The index in the cells Dictionary tells us the index
     // into this list of each cell.
-    [SerializeField]  public List<CellMaterial> cellMaterials = new List<CellMaterial>();
+    [SerializeField] public List<CellMaterial> cellMaterials = new List<CellMaterial>();
 
     // This is the main structure that we use to track which cells are in use and which material
     // each one uses.
@@ -201,11 +202,15 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
     {
         m_span.x = Math.Max(m_span.x, 1);
         m_span.y = Math.Max(m_span.y, 1);
-        m_height = Math.Max(m_height,0);
+
+        foreach(CellMaterial mat in cellMaterials)
+        {
+            mat.validate();
+        }
 
         if (renderProperties != null)
         {
-            if (renderProperties.checkAndUpdate(height, cellMaterials))
+            if (renderProperties.checkAndUpdate(cellMaterials))
             {
                 needMeshRegen = true;
             }
@@ -250,7 +255,7 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
 
     void Start()
     {
-        renderProperties = new InspectorRenderProperties(height, cellMaterials);
+        renderProperties = new InspectorRenderProperties(cellMaterials);
     }
 
     // Update is called once per frame
@@ -264,6 +269,27 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
         }
     }
 
+    private float getCellHeightOrZero(int x, int y, bool isCeiling)
+    {   
+        Vector2Int key = new Vector2Int(x,y);
+        if (containsValidCell(key))
+        {
+            int index = getCell(key);
+            if (index < cellMaterials.Count)
+            {
+                return isCeiling ? cellMaterials[index].ceilingHeight : cellMaterials[index].floorHeight;
+            }
+            else
+            {
+                // Cell points to an undefined index, we won't render it.
+                return 0;
+            }
+        }
+        else
+        {
+            return 0f;
+        }
+    }
     /*
       Creates a new mesh, called in Update if something has flagged that the mesh
       needs to be regenerated (i.e. the user changed something).
@@ -291,51 +317,65 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
             // if the user deletes an entry from the cellMaterials list that was in use. 
             if (p.Value < cellMaterials.Count)
             {
+                CellMaterial mat = cellMaterials[p.Value];
+
                 // Only generate the floor if there's a material for it.
-                if (cellMaterials[p.Value].floorMaterial != null)
+                if (mat.floorMaterial != null)
                 {
                     int floorIndex = p.Value * 3;
                     makeFloorOrCeiling(vertices, uvs, triangles[floorIndex], 
                                     new Vector2(p.Key.x, p.Key.y),     new Vector2(p.Key.x, p.Key.y+1),
-                                    new Vector2(p.Key.x+1, p.Key.y+1), new Vector2(p.Key.x+1, p.Key.y), 0f);
+                                    new Vector2(p.Key.x+1, p.Key.y+1), new Vector2(p.Key.x+1, p.Key.y), mat.floorHeight);
                 }
 
                 // Only generate walls or ceiling if the hight is set.
-                if (height > 0)
+                if (mat.ceilingHeight > 0)
                 {
                     // Only generate the ceiling if there's a material for it.
-                    if (cellMaterials[p.Value].ceilingMaterial != null)
+                    if (mat.ceilingMaterial != null)
                     {
                         int ceilingIndex = p.Value * 3 + 2;
                         makeFloorOrCeiling(vertices, uvs, triangles[ceilingIndex], 
                                         new Vector2(p.Key.x+1, p.Key.y+1), new Vector2(p.Key.x, p.Key.y+1),
-                                        new Vector2(p.Key.x, p.Key.y),     new Vector2(p.Key.x+1, p.Key.y), height);
-                    }
-
-                    // East wall
-                    if (!containsValidCell(new Vector2Int(p.Key.x-1, p.Key.y)))
-                    {
-                        makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x,p.Key.y,p.Key.x,p.Key.y+1);
-                    }
-
-                    // North wall
-                    if (!containsValidCell(new Vector2Int(p.Key.x, p.Key.y+1)))
-                    {
-                        makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x,p.Key.y+1,p.Key.x+1,p.Key.y+1);
-                    }
-
-                    // East wall
-                    if (!containsValidCell(new Vector2Int(p.Key.x+1, p.Key.y)))
-                    {
-                        makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x+1,p.Key.y+1,p.Key.x+1,p.Key.y);
-                    }
-
-                    // South wall
-                    if (!containsValidCell(new Vector2Int(p.Key.x, p.Key.y-1)))
-                    {
-                        makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x+1,p.Key.y,p.Key.x,p.Key.y);
+                                        new Vector2(p.Key.x, p.Key.y),     new Vector2(p.Key.x+1, p.Key.y), mat.ceilingHeight);
                     }
                 }
+                // Generate walls to the floors
+
+                // East wall
+                makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x,p.Key.y,p.Key.x,p.Key.y+1,
+                         mat.floorHeight, getCellHeightOrZero(p.Key.x-1, p.Key.y, false) );
+
+                // North wall
+                makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x,p.Key.y+1,p.Key.x+1,p.Key.y+1,
+                         mat.floorHeight, getCellHeightOrZero(p.Key.x, p.Key.y+1, false));
+
+                // East wall
+                makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x+1,p.Key.y+1,p.Key.x+1,p.Key.y,
+                         mat.floorHeight, getCellHeightOrZero(p.Key.x+1, p.Key.y, false));
+
+                // South wall
+                makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x+1,p.Key.y,p.Key.x,p.Key.y,
+                         mat.floorHeight, getCellHeightOrZero(p.Key.x, p.Key.y-1, false));
+
+
+                // Generate walls to the ceilings
+
+                // East wall
+                makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x,p.Key.y,p.Key.x,p.Key.y+1,
+                         getCellHeightOrZero(p.Key.x-1, p.Key.y, true), mat.ceilingHeight);
+
+                // North wall
+                makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x,p.Key.y+1,p.Key.x+1,p.Key.y+1,
+                         getCellHeightOrZero(p.Key.x, p.Key.y+1, true), mat.ceilingHeight);
+
+                // East wall
+                makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x+1,p.Key.y+1,p.Key.x+1,p.Key.y,
+                         getCellHeightOrZero(p.Key.x+1, p.Key.y, true), mat.ceilingHeight);
+
+                // South wall
+                makeWall(vertices, uvs, triangles[p.Value*3+1], p.Key.x+1,p.Key.y,p.Key.x,p.Key.y,
+                         getCellHeightOrZero(p.Key.x, p.Key.y-1, true), mat.ceilingHeight);
             }
         } 
 
@@ -388,25 +428,29 @@ public class Maze : MonoBehaviour, ISerializationCallbackReceiver
         triangles.Add(vindex+3);
     }
 
-    private void makeWall(List<Vector3> vertices, List<Vector2> uvs, List<int>triangles, float x1, float y1, float x2, float y2)
+    private void makeWall(List<Vector3> vertices, List<Vector2> uvs, List<int>triangles, float x1, float y1, float x2, float y2,
+                          float other_y, float this_y)
     {
-        int vindex = vertices.Count;
-        vertices.Add( new Vector3(x1, 0, y1));
-        vertices.Add( new Vector3(x1, height, y1));
-        vertices.Add( new Vector3(x2, height, y2));
-        vertices.Add( new Vector3(x2, 0, y2));
+        if (other_y < this_y)
+        {
+            int vindex = vertices.Count;
+            vertices.Add( new Vector3(x1, other_y, y1));
+            vertices.Add( new Vector3(x1, this_y, y1));
+            vertices.Add( new Vector3(x2, this_y, y2));
+            vertices.Add( new Vector3(x2, other_y, y2));
 
-        uvs.Add(new Vector2(0,0));
-        uvs.Add(new Vector2(0,height));
-        uvs.Add(new Vector2(1,height));
-        uvs.Add(new Vector2(1,0));
-        
-        triangles.Add(vindex);
-        triangles.Add(vindex+1);
-        triangles.Add(vindex+2);
-        triangles.Add(vindex);
-        triangles.Add(vindex+2);
-        triangles.Add(vindex+3);
+            uvs.Add(new Vector2(0,other_y));
+            uvs.Add(new Vector2(0,this_y));
+            uvs.Add(new Vector2(1,this_y));
+            uvs.Add(new Vector2(1,other_y));
+            
+            triangles.Add(vindex);
+            triangles.Add(vindex+1);
+            triangles.Add(vindex+2);
+            triangles.Add(vindex);
+            triangles.Add(vindex+2);
+            triangles.Add(vindex+3);
+        }
     }
 
     private void syncMaterials()
